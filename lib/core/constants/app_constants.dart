@@ -19,5 +19,5 @@ class AppConstants {
   static const String audioBaseUrl = 'https://cdn.islamic.network/quran/audio/128/';
   
   // AI
-  static const String geminiApiKey = 'YOUR_GEMINI_API_KEY'; // Move to secure config
+  static const String geminiApiKey = 'AIzaSyAhGJMfYZpWZdzm0Q6lr3yAJn2Q5lXviig'; // Move to secure config
 }

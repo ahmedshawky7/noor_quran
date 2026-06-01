@@ -3,6 +3,8 @@ import 'package:get_it/get_it.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/ai_assistant/data/repositories/ai_repository_impl.dart';
+import '../../features/ai_assistant/domain/repositories/ai_repository.dart';
 import '../config/app_config.dart';
 import '../database/dao/azkar_dao.dart';
 import '../database/dao/bookmark_dao.dart';
@@ -30,18 +32,18 @@ import '../../features/khatma/presentation/cubit/khatma_cubit.dart';
 
 import '../../features/settings/presentation/cubit/settings_cubit.dart';
 import '../../features/audio/presentation/cubit/audio_cubit.dart';
-import '../../features/audio/data/repositories/audio_repository_impl.dart';  // ✅ جديد
+import '../../features/audio/data/repositories/audio_repository_impl.dart'; // ✅ جديد
 import '../../features/ai_assistant/presentation/cubit/ai_assistant_cubit.dart';
 
 import '../../features/quran/presentation/cubit/surah_cubit.dart';
 import '../../features/quran/presentation/cubit/ayah_cubit.dart';
 
 final getIt = GetIt.instance;
+bool _diConfigured = false;
 
 Future<void> configureDependencies() async {
-  if (getIt.isRegistered<String>(instanceName: 'DI_INITIALIZED')) return;
-
-  getIt.registerSingleton<String>('done', instanceName: 'DI_INITIALIZED');
+  if (_diConfigured) return; // ← يوقف فوراً قبل أي async
+  _diConfigured = true;
 
   log('🔧 DI START');
 
@@ -50,12 +52,10 @@ Future<void> configureDependencies() async {
   getIt.registerSingleton<SharedPreferences>(prefs);
 
   getIt.registerLazySingleton<InternetConnectionChecker>(
-      () => InternetConnectionChecker.instance,
+    () => InternetConnectionChecker.instance,
   );
 
-  getIt.registerLazySingleton<NetworkInfo>(
-      () => NetworkInfoImpl(getIt()),
-  );
+  getIt.registerLazySingleton<NetworkInfo>(() => NetworkInfoImpl(getIt()));
 
   getIt.registerLazySingleton(() => DatabaseHelper());
   getIt.registerLazySingleton(() => QuranApiService());
@@ -64,15 +64,10 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton(() => AppRouter());
 
   // ===== SERVICES =====
-  getIt.registerLazySingleton<SyncService>(
-      () => SyncService(getIt()),
-  );
+  getIt.registerLazySingleton<SyncService>(() => SyncService(getIt()));
 
   getIt.registerLazySingleton<InitialDataService>(
-      () => InitialDataService(
-    getIt<DatabaseHelper>(),
-    getIt<QuranApiService>(),
-  ),
+    () => InitialDataService(getIt<DatabaseHelper>(), getIt<QuranApiService>()),
   );
   getIt.registerLazySingleton<AppConfig>(() => AppConfig());
   // ===== DAOs =====
@@ -85,30 +80,30 @@ Future<void> configureDependencies() async {
 
   // ===== REPOS =====
   getIt.registerLazySingleton<QuranRepository>(
-        () => QuranRepositoryImpl(getIt(), getIt()),
+    () => QuranRepositoryImpl(getIt(), getIt()),
   );
 
   getIt.registerLazySingleton<BookmarkRepository>(
-      () => BookmarkRepositoryImpl(getIt()),
+    () => BookmarkRepositoryImpl(getIt()),
   );
 
   getIt.registerLazySingleton<KhatmaRepository>(
-        () => KhatmaRepositoryImpl(getIt()),
+    () => KhatmaRepositoryImpl(getIt()),
   );
 
   // ✅ جديد: Audio Repository
-  getIt.registerLazySingleton<AudioRepositoryImpl>(
-      () => AudioRepositoryImpl(),
-  );
-
+  getIt.registerLazySingleton<AudioRepositoryImpl>(() => AudioRepositoryImpl());
+  getIt.registerLazySingleton<AIRepository>(() => AIRepositoryImpl());
   // ===== CUBITS =====
   getIt.registerFactory(() => SurahCubit(getIt()));
   getIt.registerFactory(() => AyahCubit(getIt()));
   getIt.registerFactory(() => BookmarkCubit(getIt()));
   getIt.registerFactory(() => KhatmaCubit(getIt()));
   getIt.registerFactory(() => SettingsCubit(getIt()));
-  getIt.registerFactory(() => AudioCubit(getIt<AudioRepositoryImpl>()));  // ✅ عدل ده
-  getIt.registerFactory(() => AIAssistantCubit(getIt()));
+  getIt.registerFactory(
+    () => AudioCubit(getIt<AudioRepositoryImpl>()),
+  ); // ✅ عدل ده
+  getIt.registerFactory(() => AIAssistantCubit(getIt<AIRepository>()));
 
   log('✅ DI READY');
 }

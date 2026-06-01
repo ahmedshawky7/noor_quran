@@ -1,5 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../../audio/presentation/cubit/audio_cubit.dart';
 import '../../domain/entities/ayah.dart';
+import 'advanced_playback_dialog.dart';
 
 class MushafPage extends StatelessWidget {
   final String surahName;
@@ -8,6 +13,9 @@ class MushafPage extends StatelessWidget {
   final int surahId;
   final bool isFirstPageOfSurah;
   final int? currentAyah;
+  final int? selectedAyah; // ◄◄◄ جديد
+  final Function(int?)? onSelectAyah; // ◄◄◄ جديد
+
   const MushafPage({
     super.key,
     required this.page,
@@ -16,6 +24,8 @@ class MushafPage extends StatelessWidget {
     required this.surahId,
     this.isFirstPageOfSurah = false,
     required this.currentAyah,
+    this.selectedAyah, // ◄◄◄
+    this.onSelectAyah, // ◄◄◄
   });
 
   String _cleanText(String text, int ayahNumber) {
@@ -24,10 +34,8 @@ class MushafPage extends StatelessWidget {
         r'^بِسْمِ\s+ٱ?للَّ?هِ?\s+ٱ?لرَّ?حْ?مَ?ٰ?نِ?\s+ٱ?لرَّ?حِ?يمِ?\s*',
         unicode: true,
       );
-
       text = text.replaceFirst(basmalaRegex, '').trim();
     }
-
     return text;
   }
 
@@ -40,7 +48,6 @@ class MushafPage extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           int totalChars = 0;
-
           for (var ayah in sortedAyahs) {
             totalChars += _cleanText(ayah.textUthmani, ayah.ayahNumber).length;
           }
@@ -67,17 +74,152 @@ class MushafPage extends StatelessWidget {
             if (text.isEmpty) continue;
 
             final isCurrent = currentAyah == ayah.ayahNumber;
+            final isSelected = selectedAyah == ayah.ayahNumber;
 
             spans.add(
               TextSpan(
                 text: "$text ",
+                recognizer: LongPressGestureRecognizer()
+                  ..onLongPress = () async {
+                    // تحديد الآية
+                    onSelectAyah?.call(ayah.ayahNumber);
+
+                    // فتح القائمة
+                    await showModalBottomSheet(
+                      context: context,
+                      backgroundColor: const Color(0xfff8f3e8),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
+                      ),
+                      builder: (_) {
+                        return SizedBox(
+                          height: 320,
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 20),
+
+                              ListTile(
+                                title: const Text("التفسير"),
+                                trailing: const Icon(Icons.menu_book),
+                                onTap: () {
+                                  Navigator.pop(context);
+
+                                  final prompt =
+                                      "فسر لي الآية التالية شرحاً مفصلاً وواضحاً:\n\n"
+                                      "سورة $surahName\n"
+                                      "الآية رقم ${ayah.ayahNumber}\n"
+                                      "$text\n\n"
+                                      "اشرح المعنى، الكلمات الصعبة، والدروس المستفادة.";
+
+                                  context.push(
+                                    '/ai-assistant',
+                                    extra: {
+                                      'initialPrompt': prompt,
+                                      'surahName': surahName,
+                                      'ayahNumber': ayah.ayahNumber,
+                                      'ayahText': text,
+                                    },
+                                  );
+                                },
+                              ),
+
+                              ListTile(
+                                title: const Text("تشغيل التلاوة"),
+                                trailing: const Icon(Icons.play_arrow),
+                                onTap: () {
+                                  Navigator.pop(context);
+
+                                  // تشغيل من الآية المحددة
+                                  final audioCubit = context.read<AudioCubit>();
+
+                                  final remainingAyahs = sortedAyahs
+                                      .where(
+                                        (a) => a.ayahNumber >= ayah.ayahNumber,
+                                      )
+                                      .map((a) => a.ayahNumber)
+                                      .toList();
+
+                                  audioCubit.playSurah(remainingAyahs, surahId);
+                                },
+                              ),
+                              // ابحث عن ListTile الخاص بتشغيل التلاوة المتقدم وحدث الـ onTap كالتالي:
+                              // ابحث عن ListTile الخاص بتشغيل التلاوة المتقدم وحدث الـ onTap كالتالي:
+                              ListTile(
+                                title: const Text("تشغيل التلاوة المتقدم"),
+                                trailing: const Icon(Icons.play_arrow),
+                                onTap: () {
+                                  Navigator.pop(
+                                    context,
+                                  ); // إغلاق القائمة الأساسية أولاً
+
+                                  final audioCubit = context.read<AudioCubit>();
+
+                                  AdvancedPlaybackDialog.show(
+                                    context: context,
+                                    surahName: surahName,
+                                    surahId: surahId,
+                                    startAyah: ayah.ayahNumber,
+                                    totalAyahs: sortedAyahs.last.ayahNumber,
+                                    pageNumber: page,
+                                    currentReciter:
+                                        audioCubit.repository.currentReciter,
+                                    onStart:
+                                        (
+                                          endOption,
+                                          specificAyah,
+                                          repeatMode,
+                                          verseRepeatCount,
+                                          rangeRepeatCount,
+                                        ) {
+                                          final remainingAyahs = sortedAyahs
+                                              .where(
+                                                (a) =>
+                                                    a.ayahNumber >=
+                                                    ayah.ayahNumber,
+                                              )
+                                              .map((a) => a.ayahNumber)
+                                              .toList();
+
+                                          audioCubit.playSurahAdvanced(
+                                            surahId: surahId,
+                                            ayahs: remainingAyahs,
+                                            endOption: endOption,
+                                            endAyah: specificAyah,
+                                            repeatMode: repeatMode,
+                                            verseRepeatCount: verseRepeatCount,
+                                            rangeRepeatCount: rangeRepeatCount,
+                                          );
+                                        },
+                                  );
+                                },
+                              ),
+
+                              ListTile(
+                                title: const Text("مشاركة"),
+                                trailing: const Icon(Icons.share),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+
+                    // بعد غلق القائمة ➜ إلغاء التحديد
+                    onSelectAyah?.call(null);
+                  },
                 style: TextStyle(
                   fontFamily: "Amiri",
                   fontSize: fontSize,
                   height: lineHeight,
                   color: const Color(0xff1c2a1f),
-                  backgroundColor: isCurrent
-                      ? const Color(0xffc8a96b).withOpacity(0.5)
+
+                  backgroundColor: (isCurrent || isSelected)
+                      ? const Color(0xffc8a96b).withOpacity(.5)
                       : Colors.transparent,
                 ),
               ),
@@ -98,30 +240,22 @@ class MushafPage extends StatelessWidget {
 
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-
             decoration: BoxDecoration(
               color: const Color(0xfff8f3e8),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xffc8a96b), width: 2.5),
             ),
-
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-
               child: Column(
                 children: [
-                  /// HEADER
                   Directionality(
                     textDirection: TextDirection.rtl,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
                       crossAxisAlignment: CrossAxisAlignment.baseline,
-
                       textBaseline: TextBaseline.alphabetic,
-
                       children: [
-                        // الجزء فوق يمين
                         Text(
                           "الجزء ${_toArabicNumbers('${sortedAyahs.first.juz}')}",
                           style: const TextStyle(
@@ -130,8 +264,6 @@ class MushafPage extends StatelessWidget {
                             color: Color(0xff1a472a),
                           ),
                         ),
-
-                        // اسم السورة فوق شمال
                         Text(
                           surahName,
                           style: const TextStyle(
@@ -147,11 +279,9 @@ class MushafPage extends StatelessWidget {
 
                   const Divider(color: Color(0xffc8a96b)),
 
-                  /// زخرفة السورة
                   if (isFirstPageOfSurah)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
@@ -161,10 +291,8 @@ class MushafPage extends StatelessWidget {
                             width: double.infinity,
                             fit: BoxFit.fill,
                           ),
-
                           Text(
                             surahName,
-
                             style: const TextStyle(
                               fontFamily: "Amiri",
                               fontSize: 20,
@@ -175,7 +303,6 @@ class MushafPage extends StatelessWidget {
                       ),
                     ),
 
-                  /// البسملة
                   if (isFirstPageOfSurah && surahId != 1 && surahId != 9)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -188,19 +315,19 @@ class MushafPage extends StatelessWidget {
                       ),
                     ),
 
-                  /// الآيات
                   Expanded(
-                    child: Directionality(
-                      textDirection: TextDirection.rtl,
-
-                      child: Text.rich(
-                        TextSpan(children: spans),
-                        textAlign: TextAlign.justify,
+                    child: SingleChildScrollView(
+                      physics: BouncingScrollPhysics(),
+                      child: Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Text.rich(
+                          TextSpan(children: spans),
+                          textAlign: TextAlign.justify,
+                        ),
                       ),
                     ),
                   ),
 
-                  /// رقم الصفحة تحت شمال
                   Padding(
                     padding: const EdgeInsets.only(
                       top: 8,
@@ -208,12 +335,9 @@ class MushafPage extends StatelessWidget {
                       right: 4,
                       bottom: 2,
                     ),
-
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
                       children: [
-                        // الحزب تحت يمين
                         Text(
                           "الحزب ${_toArabicNumbers('${sortedAyahs.first.hizb}')}",
                           style: const TextStyle(
@@ -223,8 +347,6 @@ class MushafPage extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
-                        // رقم الصفحة تحت شمال
                         Text(
                           "الصفحة ${_toArabicNumbers('$page')}",
                           style: const TextStyle(

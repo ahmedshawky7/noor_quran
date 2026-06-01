@@ -77,7 +77,7 @@ final List<Reciter> allReciters = [
   const Reciter(
     id: 'ajmi',
     name: 'أحمد العجمي',
-    baseUrl: 'https://everyayah.com/data/Ahmed_ibn_Ali_al-Ajmy_64kbps_QuranExplorer.Com/',
+    baseUrl: 'https://everyayah.com/data/Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net/',
   ),
   const Reciter(
     id: 'juhany',

@@ -7,22 +7,23 @@ class AudioInitial extends AudioState {
   const AudioInitial({super.reciterName});
 }
 
+class AudioLoading extends AudioState {
+  const AudioLoading({super.reciterName});
+}
 class AudioPlaying extends AudioState {
   final int? currentAyah;
   const AudioPlaying({this.currentAyah, super.reciterName});
 }
 
-class AudioPaused extends AudioState {
+class AudioError extends AudioState {
+  final String message;
+  const AudioError({required this.message, required super.reciterName});
+}
 
+class AudioPaused extends AudioState {
   final int? currentAyah;
 
-  final String reciterName;
-
-  AudioPaused({
-    this.currentAyah,
-    required this.reciterName,
-  });
-
+  AudioPaused({this.currentAyah, required super.reciterName});
 }
 
 class AudioStopped extends AudioState {

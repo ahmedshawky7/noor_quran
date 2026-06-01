@@ -19,20 +19,37 @@ class SurahDetailScreen extends StatefulWidget {
 
 class _SurahDetailScreenState extends State<SurahDetailScreen> {
   bool _showUI = false;
-  late int
-  _currentSurahId; // ◄ متغيّر محلي للاحتفاظ برقم السورة الحالية وتغييره ديناميكياً
+  late int _currentSurahId;
+  int? _selectedAyah;
+  int? _targetPageIndex; // ◄◄◄ 0 = أول صفحة، -1 = آخر صفحة
 
   @override
   void initState() {
     super.initState();
-    _currentSurahId = widget.surahId; // تهيئة السورة بالمعرف الممرر للشاشة
-
-    // ⛔ مهم: وقف أي صوت شغال من قبل
+    _currentSurahId = widget.surahId;
     context.read<AudioCubit>().reset();
     context.read<AyahCubit>().loadAyahs(_currentSurahId);
   }
 
+  void _selectAyah(int? ayahNumber) {
+    setState(() => _selectedAyah = ayahNumber);
+  }
+
+  void _changeSurah(int newSurahId, {int? targetPage}) {
+    if (newSurahId < 1 || newSurahId > 114) return;
+
+    setState(() {
+      _currentSurahId = newSurahId;
+      _targetPageIndex = targetPage;
+      _selectedAyah = null;
+    });
+
+    context.read<AudioCubit>().reset();
+    context.read<AyahCubit>().loadAyahs(newSurahId);
+  }
+
   void _showRecitersBottomSheet(BuildContext context) {
+    // ... (كما هو بدون تغيير)
     final audioCubit = context.read<AudioCubit>();
     final currentReciter = audioCubit.repository.currentReciter;
 
@@ -47,7 +64,6 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // الشريط اللي فوق
               Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
                 width: 40,
@@ -106,32 +122,26 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                               color: Color(0xffc8a96b),
                               size: 20,
                             ),
-                      onTap: () {
-                        audioCubit.changeReciter(reciter);
+                      onTap: () async {
+                        final ayahCubit = context.read<AyahCubit>();
+                        final currentAyah = await audioCubit.changeReciter(
+                          reciter,
+                        );
                         Navigator.pop(context);
 
-                        // لو كان الصوت شغال، نعيد تشغيل السورة من الآية الحالية
-                        if (audioCubit.state is AudioPlaying) {
-                          final ayahs =
-                              (context.read<AyahCubit>().state as AyahLoaded)
-                                  .ayahs
-                                  .map((e) => e.ayahNumber)
-                                  .toList();
-                          final currentAyah =
-                              (audioCubit.state as AudioPlaying).currentAyah;
-
-                          if (currentAyah != null) {
-                            // نبدأ من الآية الحالية
-                            final remainingAyahs = ayahs
-                                .skipWhile((a) => a != currentAyah)
-                                .toList();
-
-                            if (remainingAyahs.isNotEmpty) {
-                              audioCubit.playSurah(
-                                remainingAyahs,
-                                _currentSurahId,
-                              );
-                            }
+                        if (currentAyah != null &&
+                            ayahCubit.state is AyahLoaded) {
+                          final ayahs = (ayahCubit.state as AyahLoaded).ayahs
+                              .map((e) => e.ayahNumber)
+                              .toList();
+                          final remainingAyahs = ayahs
+                              .skipWhile((a) => a != currentAyah)
+                              .toList();
+                          if (remainingAyahs.isNotEmpty) {
+                            audioCubit.playSurah(
+                              remainingAyahs,
+                              _currentSurahId,
+                            );
                           }
                         }
                       },
@@ -145,19 +155,6 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
         );
       },
     );
-  }
-
-  // ◄ دالة للانتقال السلس وتحميل السورة الجديدة
-  void _changeSurah(int newSurahId) {
-    if (newSurahId < 1 || newSurahId > 114)
-      return; // حماية لعدم تخطي حدود المصحف
-
-    setState(() {
-      _currentSurahId = newSurahId;
-    });
-
-    context.read<AudioCubit>().reset();
-    context.read<AyahCubit>().loadAyahs(newSurahId);
   }
 
   @override
@@ -180,7 +177,8 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                   Text(ayahState.message),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => context.read<AyahCubit>().loadAyahs(_currentSurahId),
+                    onPressed: () =>
+                        context.read<AyahCubit>().loadAyahs(_currentSurahId),
                     child: const Text('إعادة المحاولة'),
                   ),
                 ],
@@ -196,22 +194,33 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
 
                 return Stack(
                   children: [
-                    // المصحف
                     Positioned.fill(
                       child: GestureDetector(
+                        // ✅ شيلنا السحب العمودي عشان ما يتعارضش مع Scroll داخل الصفحة
+                        // والتنقل بين السور بقى أفقي بالكامل
                         onTap: () => setState(() => _showUI = !_showUI),
                         child: QuranPageView(
+                          key: ValueKey(
+                            '$_currentSurahId-$_targetPageIndex',
+                          ),
                           surahName: ayahState.surah.nameArabic,
                           ayahs: ayahState.ayahs,
                           surahId: _currentSurahId,
                           currentAyah: currentAyah,
-                          onNextSurah: () => _changeSurah(_currentSurahId + 1),
-                          onPreviousSurah: () => _changeSurah(_currentSurahId - 1),
+                          selectedAyah: _selectedAyah,
+                          onSelectAyah: _selectAyah,
+                          // ◄◄◄ السورة التالية → ابدأ من أول صفحة
+                          onNextSurah: () =>
+                              _changeSurah(_currentSurahId + 1, targetPage: 0),
+                          // ◄◄◄ السورة السابقة → ابدأ من آخر صفحة
+                          onPreviousSurah: () =>
+                              _changeSurah(_currentSurahId - 1, targetPage: -1),
+                          initialPageIndex: _targetPageIndex,
                         ),
+
                       ),
                     ),
 
-                    // AppBar
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 300),
                       top: _showUI ? 0 : -(paddingTop + 60),
@@ -220,7 +229,6 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                       child: _buildAppBar(ayahState),
                     ),
 
-                    // شريط الصوت المُحسّن
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 300),
                       bottom: _showUI ? 20 : -180,
@@ -239,34 +247,50 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
     );
   }
 
-// AppBar
   Widget _buildAppBar(AyahLoaded state) {
     final paddingTop = MediaQuery.of(context).padding.top;
     return Container(
       padding: EdgeInsets.fromLTRB(8, paddingTop + 8, 8, 8),
       decoration: BoxDecoration(
         color: const Color(0xff1a472a),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Colors.white,
+              size: 20,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           Text(
             state.surah.nameArabic,
-            style: const TextStyle(fontFamily: 'Amiri', fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontFamily: 'Amiri',
+              fontSize: 20,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          const IconButton(icon: Icon(Icons.settings, color: Colors.white), onPressed: null),
+          const IconButton(
+            icon: Icon(Icons.settings, color: Colors.white),
+            onPressed: null,
+          ),
         ],
       ),
     );
   }
 
-// شريط الصوت المُحسّن (بدون Overflow)
-  Widget _buildAudioBar(BuildContext context, AudioState audioState, AyahLoaded ayahState) {
+  Widget _buildAudioBar(
+    BuildContext context,
+    AudioState audioState,
+    AyahLoaded ayahState,
+  ) {
     final audioCubit = context.read<AudioCubit>();
     final isPlaying = audioState is AudioPlaying;
 
@@ -275,14 +299,19 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
       decoration: BoxDecoration(
         color: const Color(0xfff8f3e8),
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, -4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              // اسم القارئ
               Expanded(
                 child: GestureDetector(
                   onTap: () => _showRecitersBottomSheet(context),
@@ -291,43 +320,62 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                     children: [
                       Text(
                         audioCubit.repository.currentReciter.name,
-                        style: const TextStyle(fontFamily: 'Cairo', fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xff1a472a)),
+                        style: const TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xff1a472a),
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xff1a472a)),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 18,
+                        color: Color(0xff1a472a),
+                      ),
                     ],
                   ),
                 ),
               ),
-
-              // أزرار التحكم
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(icon: const Icon(Icons.skip_previous, color: Colors.grey), onPressed: audioCubit.previous),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next, color: Colors.grey),
+                    onPressed: audioCubit.previous,
+                  ),
                   Container(
-                    decoration: const BoxDecoration(color: Color(0xff1a472a), shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                      color: Color(0xff1a472a),
+                      shape: BoxShape.circle,
+                    ),
                     child: IconButton(
-                      icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                      icon: Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                      ),
                       onPressed: () {
                         if (isPlaying) {
                           audioCubit.pause();
                         } else if (audioState is AudioPaused) {
                           audioCubit.resume();
                         } else {
-                          final ayahs = ayahState.ayahs.map((e) => e.ayahNumber).toList();
+                          final ayahs = ayahState.ayahs
+                              .map((e) => e.ayahNumber)
+                              .toList();
                           audioCubit.playSurah(ayahs, _currentSurahId);
                         }
                       },
                     ),
                   ),
-                  IconButton(icon: const Icon(Icons.skip_next, color: Colors.grey), onPressed: audioCubit.next),
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous, color: Colors.grey),
+                    onPressed: audioCubit.next,
+                  ),
                 ],
               ),
             ],
           ),
-
-          // Slider
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: const Color(0xff1a472a),
@@ -346,7 +394,8 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                     return Slider(
                       value: position.clamp(0, duration),
                       max: duration,
-                      onChanged: (value) => audioCubit.seek(Duration(seconds: value.toInt())),
+                      onChanged: (value) =>
+                          audioCubit.seek(Duration(seconds: value.toInt())),
                     );
                   },
                 );
@@ -357,5 +406,4 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
       ),
     );
   }
-
 }

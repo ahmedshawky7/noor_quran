@@ -19,16 +19,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _init() async {
-    // ١. شيل الـ native splash فوراً
     FlutterNativeSplash.remove();
 
-    // ٢. initialize في background والـ splash بيظهر
-    await getIt<AppConfig>().initialize();
+    // ← شغله في microtask عشان أول frame يترسم أولاً
+    await Future.microtask(() => getIt<AppConfig>().initialize());
 
-    // ٣. شغل الـ sync بعد ما الـ DB يكون جاهز
     getIt<AppConfig>().startSync();
-
-    // ٤. استنى minimum وقت
     await Future.delayed(const Duration(seconds: 2));
 
     if (mounted) context.go('/');

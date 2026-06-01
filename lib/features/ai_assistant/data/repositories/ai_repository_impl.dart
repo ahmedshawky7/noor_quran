@@ -6,15 +6,17 @@ import 'package:noor_quran/features/ai_assistant/domain/repositories/ai_reposito
 
 class AIRepositoryImpl implements AIRepository {
   late final GenerativeModel _model;
-  
+
   AIRepositoryImpl() {
     final apiKey = AppConstants.geminiApiKey;
     _model = GenerativeModel(
-      model: 'gemini-pro',
+      model: 'gemini-2.5-flash',
       apiKey: apiKey,
+      systemInstruction: Content.system(_getSystemPrompt()),
       generationConfig: GenerationConfig(
         temperature: 0.7,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
+        topP: 0.95,
       ),
       safetySettings: [
         SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
@@ -24,140 +26,95 @@ class AIRepositoryImpl implements AIRepository {
       ],
     );
   }
-  
-  String _getSystemPrompt(String task) {
+
+  String _getSystemPrompt() {
     return '''
-You are a helpful Islamic educational assistant called "Noor AI". 
+You are "Noor AI" - a helpful, respectful, and educational Islamic assistant.
+
 IMPORTANT RULES:
-- NEVER give fatwas or religious rulings. Always advise consulting qualified scholars for legal matters.
-- NEVER promote extremism, violence, or sectarianism.
-- NEVER engage in political or divisive religious debates.
-- ONLY provide educational explanations, Quranic context, language help, memorization tips, and motivational reminders.
-- For any question that asks for a ruling, respond: "I cannot provide a fatwa. Please consult a qualified scholar."
-- Be respectful, inclusive, and kind.
-
-Task: $task
+- Never issue fatwas or religious rulings. Always direct users to qualified scholars.
+- Never promote violence, extremism, or sectarianism.
+- Stay educational, motivational, and focused on Quran, memorization, and Islamic knowledge.
+- Be kind, patient, and inclusive.
+- Respond in Arabic by default unless the user asks in English.
 ''';
   }
-  
+
   @override
-  Future<Either<Failure, String>> explainAyah(String surahName, String ayahText, int ayahNumber) async {
+  Future<Either<Failure, String>> chat(
+      String userMessage,
+      List<Map<String, String>> history,
+      ) async {
     try {
-      final prompt = '''
-${_getSystemPrompt('Explain this ayah in simple Arabic/English, focusing on vocabulary, lessons, and reflection.')}
+      final List<Content> contents = [];
 
-Surah: $surahName, Ayah $ayahNumber
-Text: $ayahText
+      for (var msg in history) {
+        final role = msg['role'] ?? 'user';
+        final text = msg['text'] ?? '';
+        if (text.isEmpty) continue;
 
-Provide a clear, concise explanation (max 200 words) that helps the user understand and reflect. Include:
-- Basic meaning
-- Key vocabulary
-- Practical lesson
-- Reflection question
-''';
+        if (role == 'user') {
+          contents.add(Content.text(text));
+        } else {
+          contents.add(Content.model([TextPart(text)]));
+        }
+      }
+
+      contents.add(Content.text(userMessage));
+
+      final response = await _model.generateContent(contents);
+      final text = response.text?.trim();
+
+      return Right(text?.isNotEmpty == true
+          ? text!
+          : 'عفواً، لم أفهم الطلب جيداً. هل يمكنك إعادة صياغته؟');
+    } catch (e) {
+      return Left(AIServiceFailure('خطأ في خدمة الذكاء الاصطناعي: $e'));
+    }
+  }
+
+  // باقي الدوال (يمكن توسيعها لاحقاً)
+  @override
+  Future<Either<Failure, String>> explainAyah(
+      String surahName, String ayahText, int ayahNumber) async {
+    // ... (نفس الكود السابق مع try-catch)
+    try {
+      final prompt = 'Task: شرح الآية...\nSurah: $surahName\nAyah $ayahNumber: $ayahText';
       final response = await _model.generateContent([Content.text(prompt)]);
-      return Right(response.text ?? 'No explanation available.');
+      return Right(response.text ?? 'لا توجد إجابة حالياً');
     } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
+      return Left(AIServiceFailure('خطأ في خدمة الذكاء الاصطناعي: $e'));
     }
   }
-  
+
   @override
-  Future<Either<Failure, String>> summarizeSurah(String surahName, String surahContent) async {
+  Future<Either<Failure, String>> summarizeSurah(
+      String surahName, String surahContent) async {
+    // ... نفس المنهج
     try {
-      final prompt = '''
-${_getSystemPrompt('Summarize this surah')}
-
-Surah: $surahName
-Content: $surahContent
-
-Provide a 100-150 word summary mentioning main themes, key stories, and lessons.
-''';
+      final prompt = 'Task: لخص السورة...\nSurah: $surahName';
       final response = await _model.generateContent([Content.text(prompt)]);
-      return Right(response.text ?? 'No summary available.');
+      return Right(response.text ?? 'لا توجد ملخص حالياً');
     } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
+      return Left(AIServiceFailure('خطأ في خدمة الذكاء الاصطناعي: $e'));
     }
   }
-  
-  @override
-  Future<Either<Failure, String>> completeAyah(String partialText) async {
-    try {
-      final prompt = '''
-${_getSystemPrompt('Complete the ayah')}
 
-The user started: "$partialText"
-Complete this Quranic verse in a way that matches the Quran. If unsure, suggest similar verses.
-''';
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return Right(response.text ?? 'Could not complete the ayah.');
-    } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
-    }
-  }
-  
   @override
-  Future<Either<Failure, String>> checkMemorization(String userInput, String correctAyah) async {
-    try {
-      final prompt = '''
-${_getSystemPrompt('Help with memorization')}
+  Future<Either<Failure, String>> completeAyah(String partialText) async =>
+      Left(AIServiceFailure('غير مفعل حالياً'));
 
-User's attempt: "$userInput"
-Correct ayah: "$correctAyah"
-
-Highlight differences, suggest corrections, and give a memorization tip. Be encouraging.
-''';
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return Right(response.text ?? 'No feedback available.');
-    } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
-    }
-  }
-  
   @override
-  Future<Either<Failure, String>> chat(String userMessage, List<Map<String, String>> history) async {
-    try {
-      final messages = [
-        Content.text(_getSystemPrompt('General Islamic educational chat')),
-        ...history.map((msg) => Content.text(msg.values.first)).toList(),
-        Content.text(userMessage),
-      ];
-      final response = await _model.generateContent(messages);
-      return Right(response.text ?? 'I cannot answer that. Please ask something else.');
-    } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
-    }
-  }
-  
-  @override
-  Future<Either<Failure, String>> recommendDailyWird(Map<String, dynamic> userStats) async {
-    try {
-      final prompt = '''
-${_getSystemPrompt('Recommend daily wird (reading plan)')}
+  Future<Either<Failure, String>> checkMemorization(
+      String userInput, String correctAyah) async =>
+      Left(AIServiceFailure('غير مفعل حالياً'));
 
-User stats: $userStats
-Based on their activity, suggest a personalized daily reading plan (number of pages, surahs, or azkar) that is achievable and motivating.
-''';
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return Right(response.text ?? 'Recommendation: Read 1 juz per day.');
-    } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
-    }
-  }
-  
   @override
-  Future<Either<Failure, String>> generateReflection(String ayahText) async {
-    try {
-      final prompt = '''
-${_getSystemPrompt('Generate a reflection')}
+  Future<Either<Failure, String>> recommendDailyWird(
+      Map<String, dynamic> userStats) async =>
+      Left(AIServiceFailure('غير مفعل حالياً'));
 
-Ayah: "$ayahText"
-Write a short, inspiring reflection (max 150 words) that helps the user apply the verse's wisdom in daily life.
-''';
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return Right(response.text ?? 'Reflect on the mercy and wisdom of Allah.');
-    } catch (e) {
-      return Left(AIServiceFailure('AI service error: $e'));
-    }
-  }
+  @override
+  Future<Either<Failure, String>> generateReflection(String ayahText) async =>
+      Left(AIServiceFailure('غير مفعل حالياً'));
 }

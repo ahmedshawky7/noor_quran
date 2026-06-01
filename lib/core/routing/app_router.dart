@@ -1,11 +1,10 @@
 import 'package:go_router/go_router.dart';
 import 'package:noor_quran/features/splash/presentation/screen/splash_screen.dart';
-import 'package:noor_quran/features/onboarding/presentation/screen/onboarding_screen.dart';
 import 'package:noor_quran/features/home/presentation/screen/home_screen.dart';
+import 'package:noor_quran/features/home/presentation/screen/home_page.dart';
 import 'package:noor_quran/features/quran/presentation/screen/surah_list_screen.dart';
 import 'package:noor_quran/features/quran/presentation/screen/surah_detail_screen.dart';
 import 'package:noor_quran/features/bookmarks/presentation/screen/bookmarks_screen.dart';
-// import 'package:noor_quran/features/search/presentation/screen/search_screen.dart';
 import 'package:noor_quran/features/settings/presentation/screen/settings_screen.dart';
 import 'package:noor_quran/features/ai_assistant/presentation/screen/ai_assistant_screen.dart';
 import 'package:noor_quran/features/azkar/presentation/screen/azkar_screen.dart';
@@ -32,7 +31,7 @@ class AppRouter {
           GoRoute(
             path: '/',
 
-            builder: (context, state) => const SurahListScreen(),
+            builder: (context, state) => const HomePageScreen(),
           ),
 
           GoRoute(
@@ -40,7 +39,11 @@ class AppRouter {
 
             builder: (context, state) => const BookmarksScreen(),
           ),
+          GoRoute(
+            path: '/settings',
 
+            builder: (context, state) => const SettingsScreen(),
+          ),
           GoRoute(
             path: '/azkar',
 
@@ -58,6 +61,11 @@ class AppRouter {
 
             builder: (context, state) => const KhatmaScreen(),
           ),
+          GoRoute(
+            path: '/quran',
+
+            builder: (context, state) => const SurahListScreen(),
+          ),
         ],
       ),
 
@@ -73,8 +81,16 @@ class AppRouter {
 
       GoRoute(
         path: '/ai-assistant',
+        builder: (context, state) {
+          final args = state.extra as Map<String, dynamic>?;
 
-        builder: (context, state) => const AIAssistantScreen(),
+          return AIAssistantScreen(
+            initialPrompt: args?['initialPrompt'] as String?,
+            surahName: args?['surahName'] as String?,
+            ayahNumber: args?['ayahNumber'] as int?,
+            ayahText: args?['ayahText'] as String?,
+          );
+        },
       ),
     ],
   );
