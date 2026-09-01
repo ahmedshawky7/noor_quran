@@ -1,9 +1,20 @@
+# ============================================================
 # Miscellaneous
+# ============================================================
+
 *.class
 *.log
 *.pyc
 *.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+
 .DS_Store
+Thumbs.db
+Desktop.ini
+
 .atom/
 .build/
 .buildlog/
@@ -12,34 +23,163 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+
+# ============================================================
+# IntelliJ / Android Studio
+# ============================================================
+
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Android Studio project files
+android/.idea/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+
+# ============================================================
+# VS Code
+# ============================================================
+
+# Uncomment if you don't want VS Code settings in Git
+.vscode/
+
+
+# ============================================================
+# Flutter / Dart / Pub
+# ============================================================
+
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
+
 .pub-cache/
 .pub/
-/build/
-/coverage/
 
-# Symbolication related
+# Flutter generated documentation
+**/doc/api/
+
+# Flutter generated build ID
+**/ios/Flutter/.last_build_id
+
+# Build outputs
+/build/
+**/build/
+
+# Coverage
+/coverage/
+coverage/
+
+
+# ============================================================
+# Flutter generated files
+# ============================================================
+
+**/.generated/
+
+Flutter/ephemeral/
+Flutter/Generated.xcconfig
+Flutter/flutter_export_environment.sh
+Flutter/App.framework
+Flutter/Flutter.framework
+Flutter/Flutter.podspec
+Flutter/app.flx
+Flutter/app.zip
+Flutter/flutter_assets/
+
+# iOS Flutter generated files
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+
+
+# ============================================================
+# Android / Gradle
+# ============================================================
+
+.gradle/
+**/.gradle/
+
+# Android build directories
+/android/build/
+/android/app/build/
+android/**/build/
+
+# Gradle generated reports and intermediate files
+**/build/reports/
+**/build/intermediates/
+**/build/generated/
+**/build/kotlin/
+
+# Local Android SDK configuration
+android/local.properties
+
+# Android generated build variants
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+
+
+# ============================================================
+# Android signing / secrets
+# ============================================================
+
+*.jks
+*.keystore
+*.p12
+
+key.properties
+
+
+# ============================================================
+# iOS / Xcode
+# ============================================================
+
+**/Pods/
+**/.symlinks/
+**/DerivedData/
+**/xcuserdata/
+
+*.xcuserstate
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.moved-aside
+
+# Generated plugin registrant
+ios/Runner/GeneratedPluginRegistrant.*
+
+
+# ============================================================
+# Generated files
+# ============================================================
+
+ServiceDefinitions.json
+
+# Symbolication
 app.*.symbols
 
-# Obfuscation related
+# Obfuscation
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+
+# ============================================================
+# Other generated / temporary directories
+# ============================================================
+
+**/dgph
+**/*sync/
+**/.vagrant/
+
+.sconsign.dblite
+.tags*
+
+Icon?
